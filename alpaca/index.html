@@ -198,7 +198,7 @@
 
 <main id="view-all" class="hidden">
   <div class="tablewrap"><table class="all" id="alltable"></table></div>
-  <p class="foot">○＝終日OK、×＝出られない、時間＝その時間だけOK。右端は出勤できる人数（×以外の人数）です。</p>
+  <p class="foot">○＝終日OK、×＝出られない、時間＝その時間だけOK。右端は出勤できる人数（×以外の人数）です。赤字＝設定「人員警告の人数」（初期値1人）以下の日。</p>
 </main>
 
 <main id="view-fixed" class="hidden">
@@ -223,13 +223,14 @@
   </div>
   <div id="adminconfirm" class="confirm hidden"></div>
   <div class="row"><a id="sheetlink" href="#" target="_blank" rel="noopener">スプレッドシートを開く（下書きの編集はこちら）</a></div>
+  <div class="row"><a href="https://igr-inc.github.io/shift/alpaca/notice.html" target="_blank" rel="noopener">X投稿用の営業日画像を作る（今月・来月の営業日と臨時休業）</a></div>
   <div class="sub">次の期間の希望を集め始める</div>
   <div class="row">
     <select id="np-month" aria-label="月"></select>
     <select id="np-period" aria-label="期間"><option value="前半">前半（1〜15日）</option><option value="後半">後半（16日〜末）</option><option value="全月">全月</option></select>
   </div>
   <div class="row"><input type="text" id="np-deadline" placeholder="締切の表示（例：10月10日まで）"><button type="button" class="btn" onclick="adminSetPeriod()">この期間で受付開始</button></div>
-  <p class="foot">流れ：①締切後に「受付を締め切る」→②「希望から下書きを作る」→③スプレッドシートの「確定_期間」シートで時間を調整→④「確定を公開する」→⑤LINEで「確定しました」とURLを投稿→⑥「次の期間の希望を集め始める」で次へ。前の期間の確定はそのまま見られます。</p>
+  <p class="foot">流れ：①締切後に「受付を締め切る」→②「希望から下書きを作る」→③スプレッドシートの「確定_期間」シートで時間を調整→④「確定を公開する」→⑤LINEで「確定しました」とURLを投稿→⑥「次の期間の希望を集め始める」で次へ。前の期間の確定はそのまま見られます。スプレッドシートの「設定」シートだけでも同じ流れができます（受付→確定の下書き→確定公開→対象月・期間）。</p>
 </div>
 
 <div class="bar hidden" id="bar"><div class="bar-inner">
@@ -267,6 +268,8 @@
     clearTimeout(t._h); t._h = setTimeout(function () { t.className = 'toast'; }, err ? 4000 : 2200);
   }
   function monthLabel(m) { return (+m.slice(0, 4)) + '年' + (+m.slice(5, 7)) + '月'; }
+  // 「人数」を赤字にする基準（設定「人員警告の人数」。空なら1人以下）
+  function warnN() { var n = state && state.config ? state.config.staffWarnN : null; return (n == null || isNaN(+n)) ? 1 : +n; }
 
   function load() {
     api('getState').then(function (s) {
@@ -452,7 +455,7 @@
       if (d.closed) return '<tr class="' + cls + '">' + first + '<td colspan="' + (staff.length + 1) + '">' + esc(d.closedLabel) + '</td></tr>';
       var cnt = 0;
       var cells = staff.map(function (s) { var v = (state.entries[s] || {})[d.date] || ''; if (v && v !== '×') cnt++; return '<td>' + cell(v) + '</td>'; }).join('');
-      return '<tr class="' + cls + '">' + first + cells + '<td class="cnt' + (cnt < 2 ? ' low' : '') + '">' + cnt + '</td></tr>';
+      return '<tr class="' + cls + '">' + first + cells + '<td class="cnt' + (cnt <= warnN() ? ' low' : '') + '">' + cnt + '</td></tr>';
     }).join('');
     t.innerHTML = h + rows;
   }
@@ -513,7 +516,7 @@
       if (d.closed) return '<tr class="' + cls + '">' + first + '<td colspan="' + (staff.length + 1) + '">' + esc(d.closedLabel) + '</td></tr>';
       var cnt = 0;
       var cells = staff.map(function (s) { var v = (ent[s] || {})[d.date] || ''; if (v && v !== '休') cnt++; return '<td>' + fcell(v) + '</td>'; }).join('');
-      return '<tr class="' + cls + '">' + first + cells + '<td class="cnt' + (cnt < 2 ? ' low' : '') + '">' + cnt + '</td></tr>';
+      return '<tr class="' + cls + '">' + first + cells + '<td class="cnt' + (cnt <= warnN() ? ' low' : '') + '">' + cnt + '</td></tr>';
     }).join('');
     t.innerHTML = h + rows;
   }
