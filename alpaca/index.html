@@ -149,6 +149,7 @@
   .admin .btn.alt { background: var(--card); color: var(--ink); }
   .admin .btn.warn { border-color: var(--danger); background: var(--danger); color: #fff; }
   .admin .btn:disabled { opacity: .5; }
+  .admin .btn.one { flex: 1; padding: 13px 14px; font-size: 16px; }
   .admin .state { font-size: 13px; color: var(--muted); }
   .admin .state b { color: var(--ink); }
   .admin a { color: var(--brand-ink); font-size: 13px; }
@@ -215,22 +216,26 @@
   <h3>店舗管理（確定シフト）</h3>
   <div class="state" id="adminstate"></div>
   <div class="row"><input type="password" id="pc" placeholder="管理パスコード" autocomplete="off"></div>
-  <div class="sub">今の期間（希望の受付と確定）</div>
+  <div class="sub">確定シフトを作る（ワンクリック）</div>
+  <div class="row"><button type="button" class="btn one" id="btn-one" onclick="adminOneClick(false)">確定を作る</button></div>
+  <div class="state" id="onehint"></div>
+  <div id="adminconfirm" class="confirm hidden"></div>
+  <div class="row"><a id="fixedlink" class="hidden" href="#" target="_blank" rel="noopener">作った確定シートを開く（人数・時間の調整はこちら）</a></div>
+  <div class="row"><a id="sheetlink" href="#" target="_blank" rel="noopener">スプレッドシートを開く</a></div>
+  <div class="row"><a href="https://igr-inc.github.io/shift/alpaca/notice.html" target="_blank" rel="noopener">X投稿用の営業日画像を作る（今月・来月の営業日と臨時休業）</a></div>
+  <div class="sub">細かい操作（いま受付中の期間だけ）</div>
   <div class="row">
     <button type="button" class="btn alt" id="btn-intake" onclick="adminIntake()">受付を締め切る</button>
     <button type="button" class="btn alt" id="btn-draft" onclick="adminDraft(false)">希望から下書きを作る</button>
-    <button type="button" class="btn" id="btn-pub" onclick="adminPublish()">確定を公開する</button>
+    <button type="button" class="btn alt" id="btn-pub" onclick="adminPublish()">確定を公開する</button>
   </div>
-  <div id="adminconfirm" class="confirm hidden"></div>
-  <div class="row"><a id="sheetlink" href="#" target="_blank" rel="noopener">スプレッドシートを開く（下書きの編集はこちら）</a></div>
-  <div class="row"><a href="https://igr-inc.github.io/shift/alpaca/notice.html" target="_blank" rel="noopener">X投稿用の営業日画像を作る（今月・来月の営業日と臨時休業）</a></div>
   <div class="sub">次の期間の希望を集め始める</div>
   <div class="row">
     <select id="np-month" aria-label="月"></select>
     <select id="np-period" aria-label="期間"><option value="前半">前半（1〜15日）</option><option value="後半">後半（16日〜末）</option><option value="全月">全月</option></select>
   </div>
   <div class="row"><input type="text" id="np-deadline" placeholder="締切の表示（例：10月10日まで）"><button type="button" class="btn" onclick="adminSetPeriod()">この期間で受付開始</button></div>
-  <p class="foot">流れ：①締切後に「受付を締め切る」→②「希望から下書きを作る」→③スプレッドシートの「確定_期間」シートで時間を調整→④「確定を公開する」→⑤LINEで「確定しました」とURLを投稿→⑥「次の期間の希望を集め始める」で次へ。前の期間の確定はそのまま見られます。スプレッドシートの「設定」シートだけでも同じ流れができます（受付→確定の下書き→確定公開→対象月・期間）。</p>
+  <p class="foot">流れ：①締切が来たら上の「〇〇の確定を作る」を押す（受付の締切・確定シートづくり・スタッフへの公開まで一度に。次の期間の受付を始めた後でも、前の期間の確定を作れます）→②「作った確定シートを開く」で人数・時間を調整（スタッフの画面にすぐ出ます）→③LINEで「確定しました」とURLを投稿→④「次の期間の希望を集め始める」で次へ。前の期間の確定はそのまま見られます。スプレッドシートの「設定」シートの「確定を作る」でも同じことができます（プルダウンで期間を選ぶだけ）。</p>
 </div>
 
 <div class="bar hidden" id="bar"><div class="bar-inner">
@@ -529,9 +534,14 @@
       ((f.published || []).length ? '<br>公開中の確定：' + f.published.map(function (k) { return esc(f.items[k].label); }).join('、') : '');
     $('btn-intake').textContent = c.open === '受付中' ? '受付を締め切る' : '受付を再開する';
     $('btn-pub').textContent = pub ? '非公開に戻す' : '確定を公開する';
-    $('btn-pub').className = 'btn' + (pub ? ' alt' : '');
     $('btn-pub').disabled = !f.exists;
     $('sheetlink').href = state.sheetUrl || '#';
+    // ワンクリック確定：次に作る期間（希望が入っていて確定がまだ無い期間のうち一番早いもの。受付中の期間は変えない）
+    var nx = f.next;
+    $('btn-one').disabled = !nx;
+    $('btn-one').textContent = nx ? nx.short + 'の確定を作る（公開まで）' : '作る確定はありません';
+    $('onehint').innerHTML = nx ? '希望の送信 <b>' + nx.sent + '/' + nx.total + '人</b>' + (nx.closesIntake ? '　この期間は受付中です（押すと受付も締め切ります）' : '') :
+      '希望が入っていて確定がまだ無い期間はありません';
     var sel = $('np-month');
     if (!sel.options.length) {
       var y = +c.month.slice(0, 4), m = +c.month.slice(5, 7);
@@ -549,7 +559,7 @@
   function adminSetPeriod() {
     var month = $('np-month').value, period = $('np-period').value, dl = $('np-deadline').value.trim();
     $('adminconfirm').innerHTML = esc(month.replace('-', '年') + '月 ' + period) + ' の希望受付を始めます。今の期間の入力画面は閉じます（確定シフトは残ります）。<div class="row"><button type="button" class="btn" onclick="adminSetPeriodGo()">開始する</button><button type="button" class="btn alt" onclick="$(\'adminconfirm\').classList.add(\'hidden\')">やめる</button></div>';
-    $('adminconfirm').classList.remove('hidden');
+    showConfirm();
     window._np = { month: month, period: period, deadline: dl };
   }
   function adminSetPeriodGo() {
@@ -559,17 +569,41 @@
       .then(function (s) { state = s; $('np-month').innerHTML = ''; window._tabShown = false; render(); toast('受付を開始しました：' + s.config.periodLabel); })
       .catch(function (e) { if (e) toast(e.message || String(e), true); });
   }
-  function adminCall(action) {
+  // 確認欄は店舗管理の上のほうにあるので、出すときは見える位置へ動かす（下のボタンから出したときに画面の外にならないように）
+  function showConfirm() { var c = $('adminconfirm'); c.classList.remove('hidden'); try { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
+  function adminCall(action, extra) {
     var pc = $('pc').value.trim(); if (!pc) { toast('管理パスコードを入力してください', true); return Promise.reject(); }
     try { localStorage.setItem('yc_admin_pc' + LS_SUFFIX, pc); } catch (e) {}
-    return api('adminAction', { passcode: pc, action: action });
+    var p = { passcode: pc, action: action };
+    for (var k in (extra || {})) p[k] = extra[k];
+    return api('adminAction', p);
+  }
+  // ワンクリック確定：確定シートを作ってスタッフに公開（受付中の期間なら受付も締め切る）。未送信の人がいて受付も締め切るときだけ確認を出す
+  // key は確認を出したときの期間（確認の後に別の期間を作らないように、押した時点の期間を渡す）
+  function adminOneClick(go, key) {
+    var nx = state.fixed && state.fixed.next; if (!nx) return;
+    if (!go && nx.closesIntake && nx.sent < nx.total) {
+      $('adminconfirm').innerHTML = esc(nx.short) + 'の希望はまだ ' + (nx.total - nx.sent) + '人が未送信です（送信 ' + nx.sent + '/' + nx.total + '人）。受付を締め切って確定を作り、スタッフに公開します。<div class="row"><button type="button" class="btn" onclick="adminOneClick(true, \'' + esc(nx.key) + '\')">作って公開する</button><button type="button" class="btn alt" onclick="$(\'adminconfirm\').classList.add(\'hidden\')">やめる</button></div>';
+      showConfirm(); return;
+    }
+    $('adminconfirm').classList.add('hidden');
+    $('btn-one').disabled = true;
+    $('btn-one').textContent = '作成中…（10〜20秒）';
+    adminCall('oneClick', { key: key || nx.key }).then(function (s) {
+      state = s; render();
+      var m = s.made;
+      if (m && m.url) { $('fixedlink').href = m.url; $('fixedlink').textContent = m.short + 'の確定シートを開く（人数・時間の調整はこちら）'; $('fixedlink').classList.remove('hidden'); }
+      if (m && m.msg) $('onehint').textContent = '✅ ' + m.msg;
+      if (s.oneClickExists) toast('この期間の確定シートは既にあります', true);
+      else toast((m ? m.short : '') + 'の確定を作ってスタッフに公開しました。人数の調整はシートで');
+    }).catch(function (e) { if (e) toast(e.message || String(e), true); if (state) render(); });
   }
   function adminDraft(force) {
     $('adminconfirm').classList.add('hidden');
     adminCall(force ? 'draftForce' : 'draft').then(function (s) {
       if (s.draftExists) {
-        $('adminconfirm').innerHTML = '確定シートは既にあります。作り直すと今の内容は消えます。<div class="row"><button type="button" class="btn warn" onclick="adminDraft(true)">作り直す</button><button type="button" class="btn alt" onclick="$(\'adminconfirm\').classList.add(\'hidden\')">やめる</button></div>';
-        $('adminconfirm').classList.remove('hidden'); return;
+        $('adminconfirm').innerHTML = '確定シートは既にあります。作り直すと、今の内容は隠しシート（旧確定_…）に移して作り直します。<div class="row"><button type="button" class="btn warn" onclick="adminDraft(true)">作り直す</button><button type="button" class="btn alt" onclick="$(\'adminconfirm\').classList.add(\'hidden\')">やめる</button></div>';
+        showConfirm(); return;
       }
       state = s; render(); toast('下書きを作りました。スプレッドシートで調整してください');
     }).catch(function (e) { if (e) toast(e.message || String(e), true); });
