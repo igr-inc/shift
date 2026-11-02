@@ -221,6 +221,7 @@
   <div class="state" id="onehint"></div>
   <div id="adminconfirm" class="confirm hidden"></div>
   <div class="row"><a id="fixedlink" class="hidden" href="#" target="_blank" rel="noopener">作った確定シートを開く（人数・時間の調整はこちら）</a></div>
+  <div class="row hidden" id="adjustbox"></div>
   <div class="row"><a id="sheetlink" href="#" target="_blank" rel="noopener">スプレッドシートを開く</a></div>
   <div class="row"><a href="https://igr-inc.github.io/shift/yellowcat/notice.html" target="_blank" rel="noopener">X投稿用の営業日画像を作る（今月・来月の営業日と臨時休業）</a></div>
   <div class="sub">細かい操作（いま受付中の期間だけ）</div>
@@ -235,7 +236,7 @@
     <select id="np-period" aria-label="期間"><option value="前半">前半（1〜15日）</option><option value="後半">後半（16日〜末）</option><option value="全月">全月</option></select>
   </div>
   <div class="row"><input type="text" id="np-deadline" placeholder="締切の表示（例：10月10日まで）"><button type="button" class="btn" onclick="adminSetPeriod()">この期間で受付開始</button></div>
-  <p class="foot">流れ：①締切が来たら上の「〇〇の確定を作る」を押す（受付の締切・確定シートづくり・スタッフへの公開まで一度に。次の期間の受付を始めた後でも、前の期間の確定を作れます）→②「作った確定シートを開く」で人数・時間を調整（スタッフの画面にすぐ出ます）→③LINEで「確定しました」とURLを投稿→④「次の期間の希望を集め始める」で次へ。前の期間の確定はそのまま見られます。スプレッドシートの「設定」シートの「確定を作る」でも同じことができます（プルダウンで期間を選ぶだけ）。</p>
+  <p class="foot">流れ：①締切が来たら上の「〇〇の確定を作る」を押す（受付の締切・確定シートづくり・スタッフへの公開まで一度に。次の期間の受付を始めた後でも、前の期間の確定を作れます）→②「作った確定シートを開く」で人数・時間を調整（スタッフの画面にすぐ出ます。その間、確定シフトの上に「調整中（LINEで知らせるまで変わります）」と出ます）→③「〇〇の調整が終わった」を押して「調整中」を消し、LINEで「確定しました」とURLを投稿→④「次の期間の希望を集め始める」で次へ。前の期間の確定はそのまま見られます。スプレッドシートの「設定」シートの「確定を作る」でも同じことができます（プルダウンで期間を選ぶだけ）。</p>
 </div>
 
 <div class="bar hidden" id="bar"><div class="bar-inner">
@@ -497,7 +498,9 @@
       b.onclick = function () { window._pkey = k; renderFixed(); }; chips.appendChild(b);
     });
     var ent = item ? item.entries : {}; var days = item ? item.days : [];
-    var memo = $('fixedmemo'); if (f.memo && key === f.currentKey) { memo.textContent = f.memo; memo.classList.remove('hidden'); } else memo.classList.add('hidden');
+    // 確定メモは期間ごと（「調整中」はその期間のタブにだけ出る。2026-11-02〜）。古い呼び出し口なら今までどおり受付中の期間だけ
+    var mtext = item ? (item.memo != null ? item.memo : (key === f.currentKey ? f.memo : '')) : '';
+    var memo = $('fixedmemo'); if (mtext) { memo.textContent = mtext; memo.classList.remove('hidden'); } else memo.classList.add('hidden');
     var mine = $('mine');
     if (me && item) {
       var my = ent[me] || {}, work = [], off = 0, tbd = 0;
@@ -542,6 +545,10 @@
     $('btn-one').textContent = nx ? nx.short + 'の確定を作る（公開まで）' : '作る確定はありません';
     $('onehint').innerHTML = nx ? '希望の送信 <b>' + nx.sent + '/' + nx.total + '人</b>' + (nx.closesIntake ? '　この期間は受付中です（押すと受付も締め切ります）' : '') :
       '希望が入っていて確定がまだ無い期間はありません';
+    // 「調整中」を出している期間ごとに「調整が終わった」ボタン（押すと確定シフトの上の「調整中」が消える）
+    var adj = f.adjusting || [], box = $('adjustbox');
+    box.innerHTML = adj.map(function (a) { return '<button type="button" class="btn alt" onclick="adminClearAdjust(\'' + esc(a.key) + '\', \'' + esc(a.short) + '\')">' + esc(a.short) + 'の調整が終わった（「調整中」を消す）</button>'; }).join('');
+    box.classList.toggle('hidden', !adj.length);
     var sel = $('np-month');
     if (!sel.options.length) {
       var y = +c.month.slice(0, 4), m = +c.month.slice(5, 7);
@@ -596,6 +603,15 @@
       if (m && m.msg) $('onehint').textContent = '✅ ' + m.msg;
       if (s.oneClickExists) toast('この期間の確定シートは既にあります', true);
       else toast((m ? m.short : '') + 'の確定を作ってスタッフに公開しました。人数の調整はシートで');
+    }).catch(function (e) { if (e) toast(e.message || String(e), true); if (state) render(); });
+  }
+  function adminClearAdjust(key, short) {
+    var bs = $('adjustbox').querySelectorAll('button');
+    for (var i = 0; i < bs.length; i++) bs[i].disabled = true;
+    adminCall('clearAdjust', { key: key }).then(function (s) {
+      state = s; render();
+      if (s.adjustNone) toast(short + 'の「調整中」はもう消えていました');
+      else toast(short + 'の「調整中」を消しました。LINEで「確定しました」と知らせてください');
     }).catch(function (e) { if (e) toast(e.message || String(e), true); if (state) render(); });
   }
   function adminDraft(force) {
